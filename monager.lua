@@ -31,6 +31,9 @@ _addon.author = 'PaintyLux'
 _addon.version = '0.0.0.1'
 _addon.commands = { 'mon', 'monager' }
 
+LOAD_FNS = {}
+LOADED_ADDONS = {}
+
 require 'logger'
 require 'pack'
 require 'tables'
@@ -39,7 +42,9 @@ TEXTS       = require 'texts'
 PACKETS     = require 'packets'
 RES         = require 'resources'
 
+require 'attack_solver'
 require 'attack_swing_tracker'
+require 'stat_tracker'
 
 PERSISTENT_DATA = {
     species_levels = {},
@@ -226,5 +231,22 @@ windower.register_event( 'addon command', function(command, ...)
         if params[1] == 'dmg' then
             BASE_DMG_TEXT:show()
         end
+    end
+
+    if command == 'load' then
+        if LOAD_FNS[ params[1] ] == nil then return end
+        if LOAD_FNS[ params[1] ] then
+            LOAD_FNS[ params[1] ]()
+        end
+    end
+
+    if command == 'unload' then
+        if LOADED_ADDONS[ params[1] ] == nil then return end
+
+        for _, fn_handle in pairs( LOADED_ADDONS[ params[1] ] ) do
+            windower.unregister_event( fn_handle )
+        end
+
+        LOADED_ADDONS[ params[1] ] = nil
     end
 end )

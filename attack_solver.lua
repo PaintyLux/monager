@@ -316,7 +316,7 @@ local function init_calc_attack()
     calculate_attack:schedule( 2, false )
 end
 
-windower.register_event( "incoming chunk", function( id, packet_raw )
+local incoming_chunk_fn = function( id, packet_raw )
     if id == 0x061 then
         local packet_data = PACKETS.parse( "incoming", packet_raw )
 
@@ -335,10 +335,10 @@ windower.register_event( "incoming chunk", function( id, packet_raw )
             end
         end
     end
-end)
+end
 
 
-windower.register_event( 'addon command', function(command, ...)
+local addon_command_fn = function(command, ...)
     local params = L{...}
 
     if command == nil then return end
@@ -352,9 +352,19 @@ windower.register_event( 'addon command', function(command, ...)
     if command == 'unequip' then
         reset_instincts()
     end
-end )
+end
 
-return {
-    calc_attack = init_calc_attack,
-    reset = reset_instincts,
-}
+LOAD_FNS = LOAD_FNS or {}
+LOAD_FNS['atk'] = function()
+    LOADED_ADDONS = LOADED_ADDONS or {}
+
+    if LOADED_ADDONS['atk'] == nil then
+        print( "Loading 'attack solver' submodule")
+        LOADED_ADDONS['atk'] = {
+            windower.register_event( 'addon command', addon_command_fn ),
+            windower.register_event( 'incoming chunk', incoming_chunk_fn ),
+        }
+    else
+        print( "Module 'attack solver' already loaded.")
+    end
+end

@@ -146,7 +146,7 @@ end
 
 local function stat_scraper( packet_id, packet_raw )
     if packet_id == 0x061 then
-        if windower.ffxi.get_player().main_job_id ~= 0x17 or true then
+        if windower.ffxi.get_player().main_job_id ~= 0x17 then
             return
         end
 
@@ -186,6 +186,7 @@ local function stat_scraper( packet_id, packet_raw )
 end
 
 local function command_handler( command, ... )
+    local params = {...}
     if command == "e" or command == "export" then
         export_lua()
         export_markdown()
@@ -193,5 +194,17 @@ local function command_handler( command, ... )
     end
 end
 
-windower.register_event( "incoming chunk", stat_scraper )
-windower.register_event( "addon command", command_handler )
+LOAD_FNS = LOAD_FNS or {}
+LOAD_FNS['stats'] = function()
+    LOADED_ADDONS = LOADED_ADDONS or {}
+
+    if LOADED_ADDONS['stats'] == nil then
+        print("Loading stat submodule")
+        LOADED_ADDONS['stats'] = {
+            windower.register_event( "incoming chunk", stat_scraper ),
+            windower.register_event( "addon command", command_handler ),
+        }
+    else
+        print( "Module 'stats' already loaded.")
+    end
+end

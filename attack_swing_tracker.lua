@@ -87,40 +87,55 @@ local function parse_combat_action_0X28( packet_raw )
     ATTACK_SWING_TEXT.swing_data = str
 end
 
-windower.register_event( 'load', function()
-    ATTACK_SWING_TEXT = TEXTS.new(attack_swing_str)
-    TEXTS.font( ATTACK_SWING_TEXT, 'Consolas' )
-end )
-
-windower.register_event( 'incoming chunk', function( type_id, packet_raw, modified, injected, blocked )
+local incoming_chunk_fn = function( type_id, packet_raw, modified, injected, blocked )
     if injected or blocked then return end
 
     if type_id == 0x28 then
         parse_combat_action_0X28( packet_raw )
     end
-end )
+end
 
-windower.register_event( 'addon command', function(command, ...)
+local addon_command_fn = function(command, ...)
     local params = L{...}
 
     if command == nil then return end
 
     if command == 'hide' then
-        if params[1] == 'swing' then
+        if params[1] == 'swings' then
             ATTACK_SWING_TEXT:hide()
         end
     end
 
     if command == 'show' then
-        if params[1] == 'swing' then
+        if params[1] == 'swings' then
             ATTACK_SWING_TEXT:show()
         end
     end
-end )
 
-windower.register_event( 'zone change', function ()
+    if command == 'reload' and params[1] == 'swings' then
+        recorded_swings.regular = {}
+        recorded_swings.critical = {}
+        ATTACK_SWING_TEXT.swing_data = ""
+    end
+end
+
+local zone_change_fn = function ()
     recorded_swings.regular = {}
     recorded_swings.critical = {}
 
     ATTACK_SWING_TEXT.swing_data = ""
-end )
+end
+
+LOAD_FNS = LOAD_FNS or {}
+LOAD_FNS['swings'] = function()
+    LOADED_ADDONS = LOADED_ADDONS or {}
+
+    ATTACK_SWING_TEXT = ATTACK_SWING_TEXT or TEXTS.new(attack_swing_str)
+    TEXTS.font( ATTACK_SWING_TEXT, 'Consolas' )
+
+    LOADED_ADDONS['swings'] = {
+        windower.register_event( 'addon command', addon_command_fn ),
+        windower.register_event( 'incoming chunk', incoming_chunk_fn ),
+        windower.register_event( 'zone change', zone_change_fn ),
+    }
+end
