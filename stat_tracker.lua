@@ -24,6 +24,13 @@ local function export_markdown()
         return
     end
 
+    f:write( [[# Stat Tables
+
+_The following stats have been obtained as-is from the game._
+_Unfortunately merit points affect monster stats and are included in the listed values, but all merit point categories are at the maximum and will affect all stats consistently._
+
+]])
+
     for _, species_key in ipairs( get_sorted_integer_keys( saved_stats ) ) do
         local species_data = saved_stats[ tostring(species_key) ]
 
