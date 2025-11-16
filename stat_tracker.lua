@@ -4,13 +4,13 @@ local res = require("resources")
 
 local saved_stats = config.load( "data/monster_stats.xml", T{} )
 
-local function get_sorted_integer_keys( table )
+local function get_sorted_integer_keys( table_to_sort )
     local keys = {}
-    for key, data in pairs( table ) do
+    for key, _ in pairs( table_to_sort ) do
         table.insert(keys, tonumber(key))
     end
 
-    table.sort( keys )
+    table_to_sort.sort( keys )
     return keys
 end
 
