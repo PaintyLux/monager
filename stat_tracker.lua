@@ -14,6 +14,22 @@ local function get_sorted_integer_keys( table_to_sort )
     return keys
 end
 
+local function get_monster_entry_for_sheets( level, monster_id )
+    local monster_key = tostring(monster_id)
+
+    if not saved_stats[tostring( monster_id )] then
+        return { hp = '', mp = '', str = '', dex = '', vit = '', agi = '', int = '', mnd = '', chr = '' }
+    end
+
+    local level_key = tostring(level)
+
+    if not saved_stats[monster_key]['level_data'][level_key] then
+        return { hp = '', mp = '', str = '', dex = '', vit = '', agi = '', int = '', mnd = '', chr = '' }
+    end
+
+    return saved_stats[monster_key]['level_data'][level_key]
+end
+
 local function export_markdown()
     local file_name = windower.addon_path .. 'exported/exported.md'
 
@@ -94,7 +110,91 @@ local function export_lua()
     print( string.format( "Exported lua @ %s", file_name ) )
 end
 
+local SQL_SETUP_STRING_MONSTER_STATS =
+[[CREATE TABLE IF NOT EXISTS `monster_stats_per_level` (
+	`species_id` SMALLINT UNSIGNED,
+	`level` TINYINT UNSIGNED,
+	`hp` SMALLINT UNSIGNED,
+	`mp` SMALLINT UNSIGNED,
+	`str` SMALLINT UNSIGNED,
+	`dex` SMALLINT UNSIGNED,
+	`vit` SMALLINT UNSIGNED,
+	`agi` SMALLINT UNSIGNED,
+	`int` SMALLINT UNSIGNED,
+	`mnd` SMALLINT UNSIGNED,
+	`chr` SMALLINT UNSIGNED,
+	PRIMARY KEY (`species_id`, `level`)
+);
+
+INSERT INTO
+    `monster_stats_per_level` ( `species_id`, `level`, `hp`, `mp`, `str`, `dex`, `vit`, `agi`, `int`, `mnd`, `chr` )
+VALUES
+]]
+
+local SQL_TEARDOWN_STRING_MONSTER_STATS =
+[[
+    (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 )
+ON DUPLICATE KEY UPDATE
+    `species_id` = VALUES(`species_id`),
+    `level` = VALUES(`level`),
+    `hp` = VALUES(`hp`),
+    `mp` = VALUES(`mp`),
+    `str` = VALUES(`str`),
+    `dex` = VALUES(`dex`),
+    `agi` = VALUES(`agi`),
+    `int` = VALUES(`int`),
+    `mnd` = VALUES(`mnd`),
+    `chr` = VALUES(`chr`);]]
+
+local SQL_SETUP_STRING_MONSTER_SPECIES =
+[[CREATE TABLE IF NOT EXISTS `monster_species` (
+	`species_id` SMALLINT UNSIGNED,
+	`species` VARCHAR(32),
+	PRIMARY KEY (`species_id`)
+);
+
+INSERT INTO
+    `monster_species` ( `species_id`, `species` )
+VALUES
+]]
+
+local SQL_TEARDOWN_STRING_MONSTER_SPECIES =
+[[
+    (0, "-" )
+ON DUPLICATE KEY UPDATE
+    `species_id` = VALUES(`species_id`),
+    `species` = VALUES(`species`);]]
+
+local function export_monster_species_list_sql()
+    local file_name = windower.addon_path .. 'exported/monster_species.sql'
+
+    local f = io.open( file_name, 'w+' )
+
+    if f == nil then
+        print( string.format( 'Error opening export file "%s"', file_name ) )
+        return
+    end
+
+    f:write( SQL_SETUP_STRING_MONSTER_SPECIES )
+
+    for idx = 1, 511 do
+        local species_name = RES.monstrosity[idx] and RES.monstrosity[idx].en or '-'
+        f:write( string.format(
+            "\t( %3d, \"%s\" ),\n",
+            idx,
+            species_name
+        ))
+    end
+
+    f:write( SQL_TEARDOWN_STRING_MONSTER_SPECIES )
+
+    f:close()
+
+    print( string.format( "Exported sql @ %s", file_name ) )
+end
+
 local function export_sql()
+    export_monster_species_list_sql()
     local file_name = windower.addon_path .. 'exported/exported.sql'
 
     local f = io.open( file_name, 'w+' )
@@ -104,9 +204,8 @@ local function export_sql()
         return
     end
 
-    f:write('INSERT INTO\n')
-    f:write('\t`monster_stats_per_level` ( `species_id`, `species`, `level`, `hp`, `mp`, `str`, `dex`, `vit`, `agi`, `int`, `mnd`, `chr` ) \n')
-    f:write('VALUES\n')
+
+    f:write( SQL_SETUP_STRING_MONSTER_STATS )
 
     for _, species_key in ipairs( get_sorted_integer_keys( saved_stats ) ) do
         local species_data = saved_stats[ tostring( species_key ) ]
@@ -115,7 +214,7 @@ local function export_sql()
             level_key = tostring(level_key)
 
             f:write( string.format(
-                "\t( %3d, %2s, %5d, %5d, %3d, %3d, %3d, %3d, %3d, %3d, %3d, %s ),\n",
+                "\t( %3d, %2s, %5d, %5d, %3d, %3d, %3d, %3d, %3d, %3d, %3d ),\n",
                 species_data.id,
                 level_key,
                 species_data.level_data[level_key].hp,
@@ -126,25 +225,12 @@ local function export_sql()
                 species_data.level_data[level_key].agi,
                 species_data.level_data[level_key].int,
                 species_data.level_data[level_key].mnd,
-                species_data.level_data[level_key].chr,
-                '"' .. species_data.species .. '"'
+                species_data.level_data[level_key].chr
             ) )
         end
     end
 
-    f:write("\t(0, \"-\", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 )\n")
-    f:write("ON DUPLICATE KEY UPDATE\n")
-    f:write("\t`species_id` = VALUES(`species_id`),\n")
-    f:write("\t`species` = VALUES(`species`),\n")
-    f:write("\t`level` = VALUES(`level`),\n")
-    f:write("\t`hp` = VALUES(`hp`),\n")
-    f:write("\t`mp` = VALUES(`mp`),\n")
-    f:write("\t`str` = VALUES(`str`),\n")
-    f:write("\t`dex` = VALUES(`dex`),\n")
-    f:write("\t`agi` = VALUES(`agi`),\n")
-    f:write("\t`int` = VALUES(`int`),\n")
-    f:write("\t`mnd` = VALUES(`mnd`),\n")
-    f:write("\t`chr` = VALUES(`chr`);")
+    f:write( SQL_TEARDOWN_STRING_MONSTER_STATS )
 
     f:close()
 
