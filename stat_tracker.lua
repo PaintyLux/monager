@@ -194,12 +194,122 @@ local function stat_scraper( packet_id, packet_raw )
     end
 end
 
+local function validate_imported_table( file_path )
+    local imported_data = config.load( file_path )
+
+    local stat_keys = { "agi", "chr", "dex", "hp", "int", "mnd", "mp", "str", "vit" }
+
+    for monster_key, monster_table in pairs( imported_data ) do
+        if tostring(monster_key) ~= tostring(monster_table.id) then
+            print( string.format( "Malformed/missing monster id [%s] in imported table.", tostring(monster_key)))
+            return nil
+        end
+
+        if tonumber(monster_key) < 1 or tonumber(monster_key) > 512 then
+            print( string.format( "Out-of-bounds monster id [%s] in imported table.", tostring(monster_key)))
+            return nil
+        end
+
+        if monster_table.species == nil or type(monster_table.species) ~= "string" then
+            print( string.format( "Malformed/missing species name for monster id [%s]", tostring(monster_key) ) )
+            return nil
+        end
+
+        if monster_table.level_data == nil then
+            print( string.format( "No level data for monster id [%s], continuing", tostring(monster_key)))
+        elseif type(monster_table.level_data) ~= "table" then
+            print( string.format( "Malformed level data (not a table) for monster id [%s]", tostring(monster_key)))
+            return nil
+        end
+
+        for level_key, level_data in pairs( monster_table.level_data ) do
+            local converted_level = tonumber(level_key)
+
+            if converted_level == nil then
+               print( string.format( "Malformed level entry [LV%s] for monster id [%s]", level_key, monster_key))
+               return nil
+            end
+            if converted_level < 1 or converted_level > 99 then
+               print( string.format( "Out-of-bounds level entry [LV%s] for monster id [%s]", level_key, monster_key))
+               return nil
+            end
+
+            for _, stat_key in pairs( stat_keys ) do
+                if level_data[stat_key] == nil then
+                    print( string.format( "Missing entry for stat [%s] in level [LV%s] for monster id [%s]", stat_key, level_key, monster_key))
+                    return nil
+                end
+
+                if type(level_data[stat_key]) ~= "number" or level_data[stat_key] < 0 then
+                    print( string.format( "Malformed entry for stat [%s] in level [LV%s] for monster id [%s]", stat_key, level_key, monster_key))
+                    return nil
+                end
+            end
+        end
+    end
+
+    return imported_data
+end
+
+local function try_import( file_path )
+    if not windower.file_exists( windower.addon_path .. file_path ) then
+        print( string.format( "File '%s' does not exist.", file_path ) )
+        return
+    end
+
+    local imported_data = validate_imported_table( file_path )
+
+    if imported_data == nil then
+        return
+    end
+
+    for species_id_key, monster_table in pairs( imported_data ) do
+        local species_id = tonumber(species_id_key)
+
+        if saved_stats[species_id_key] == nil then
+            saved_stats[species_id_key] = {
+                id = species_id,
+                species = RES.monstrosity[species_id].en,
+                level_data = {},
+            }
+        end
+
+        for level_key, level_data in pairs( monster_table.level_data ) do
+            if saved_stats[species_id_key]['level_data'][level_key] == nil then
+                saved_stats[species_id_key]['level_data'][level_key] = level_data
+            else
+                for stat_key, stat_value in pairs(level_data) do
+                    if saved_stats[species_id_key]['level_data'][level_key][stat_key] ~= stat_value then
+                        print( string.format( "Non-matching stat data for '%s' @ monster id [%s] [LV%s]", stat_key, species_id_key, level_key))
+                    end
+                end
+            end
+        end
+    end
+
+    print("Import successful.")
+end
+
+local function import_handler( file_name )
+    local suffix = string.sub(file_name, -4, -4)
+
+    if suffix == ".xml" then
+        try_import( "data/" .. file_name )
+    else
+        try_import( "data/" .. file_name .. ".xml" )
+    end
+end
+
 local function command_handler( command, ... )
     local params = {...}
     if command == "e" or command == "export" then
         export_lua()
         export_markdown()
         export_sql()
+    end
+
+    if command == "i" or command == "import" then
+        import_handler( params[1] )
     end
 end
 
