@@ -166,6 +166,8 @@ local function stat_scraper( packet_id, packet_raw )
             return
         end
 
+        windower.add_to_chat( 1, string.format("Got stats for [%s] @ LV%s", RES.monstrosity[species_id].en, player_level_key))
+
         local species_id_key = tostring( species_id )
 
         if saved_stats[species_id_key] == nil then
