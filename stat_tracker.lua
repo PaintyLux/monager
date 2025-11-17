@@ -30,6 +30,83 @@ local function get_monster_entry_for_sheets( level, monster_id )
     return saved_stats[monster_key]['level_data'][level_key]
 end
 
+local function export_sheets()
+    local file_name = windower.addon_path .. 'exported/exported.txt'
+
+    local f = io.open( file_name, 'w+' )
+
+    if f == nil then
+        print( string.format( 'Error opening export file "%s"', file_name ) )
+        return
+    end
+
+    local valid_monster_ids = {}
+
+    local stats = { 'hp', 'mp', 'str', 'dex', 'vit', 'agi', 'int', 'mnd', 'chr' }
+
+    for idx = 1, 511 do
+        if RES.monstrosity[idx] then
+            table.insert( valid_monster_ids, idx )
+        end
+    end
+
+    do
+        local id_line = "Monster ID\t"
+        local species_line = "Level\t"
+        local stat_line = "Stat\t"
+
+        for _, stat in ipairs( stats ) do
+            for _, idx in pairs( valid_monster_ids ) do
+                local monster_name = string.gsub( RES.monstrosity[idx].en, " %(.*%)", "")
+                id_line = id_line .. idx .. "\t"
+                species_line = species_line .. monster_name .. "\t"
+                stat_line = stat_line .. string.upper( stat ) .. "\t"
+            end
+        end
+
+        f:write( string.format( "%s\n%s\n%s\n", stat_line, id_line, species_line ) )
+    end
+
+    local strings = {}
+
+    for level = 1, 99 do
+        strings['hp'] = ""
+        strings['mp'] = ""
+        strings['str'] = ""
+        strings['dex'] = ""
+        strings['vit'] = ""
+        strings['agi'] = ""
+        strings['int'] = ""
+        strings['mnd'] = ""
+        strings['chr'] = ""
+
+        for _, monster_id in ipairs( valid_monster_ids ) do
+            local result = get_monster_entry_for_sheets( level, monster_id )
+
+            for _, stat in ipairs( stats ) do
+                strings[stat] = strings[stat] .. result[stat] .. '\t'
+            end
+        end
+
+        f:write( string.format("%d\t%s%s%s%s%s%s%s%s%s\n",
+            level,
+            strings['hp'],
+            strings['mp'],
+            strings['str'],
+            strings['dex'],
+            strings['vit'],
+            strings['agi'],
+            strings['int'],
+            strings['mnd'],
+            strings['chr']
+        ) )
+    end
+
+    f:close()
+
+    print( string.format( "Exported sheets compatible txt @ %s", file_name ) )
+end
+
 local function export_markdown()
     local file_name = windower.addon_path .. 'exported/exported.md'
 
@@ -392,6 +469,7 @@ local function command_handler( command, ... )
         export_lua()
         export_markdown()
         export_sql()
+        export_sheets()
     end
 
     if command == "i" or command == "import" then
